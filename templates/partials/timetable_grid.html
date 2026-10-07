@@ -1,0 +1,27 @@
+<div class="card table-box tt-wrap">
+  <table class="tt">
+    <thead>
+      <tr><th class="tt-time">Period</th>{% for d in days %}<th>{{ DAY_NAMES[d] }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      {% if r.type == 'break' %}
+      <tr class="tt-break"><td colspan="{{ days|length + 1 }}">{{ r.label }} &middot; {{ r.start|nice_time }} - {{ r.end|nice_time }}</td></tr>
+      {% else %}
+      <tr>
+        <td class="tt-time"><strong>P{{ r.no }}</strong><span>{{ r.start|nice_time }}<br>{{ r.end|nice_time }}</span></td>
+        {% for d in days %}
+          {% set c = cells.get((d, r.no)) %}
+          {% if c %}
+          <td><div class="tt-cell" style="--h: {{ c.subject|subject_hue }}">
+            <b>{{ c.subject }}{% if c.lab %} <small>LAB</small>{% endif %}</b>
+            <span>{{ c.label if mode == 'teacher' else c.teacher }}</span>
+          </div></td>
+          {% else %}<td><div class="tt-free">-</div></td>{% endif %}
+        {% endfor %}
+      </tr>
+      {% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+</div>

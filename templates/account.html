@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block nav_account %}active{% endblock %}
+{% block content %}
+<div class="page-title"><div><h1>Account</h1><p class="sub">Signed in as <b>{{ username }}</b> &middot; {{ 'HOD' if session.role == 'hod' else 'Teacher' }}</p></div></div>
+<div class="card" style="max-width:32rem">
+  <h2 style="margin-top:0">Change password</h2>
+  <form method="POST" action="{{ url_for('account') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="field"><label for="old_password">Current password</label>
+      <input type="password" id="old_password" name="old_password" autocomplete="current-password" required></div>
+    <div class="field"><label for="new_password">New password</label>
+      <input type="password" id="new_password" name="new_password" minlength="8" autocomplete="new-password" required>
+      <p class="hint">At least 8 characters.</p></div>
+    <div class="field"><label for="confirm_password">Confirm new password</label>
+      <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" required></div>
+    <div class="form-buttons"><button type="submit" class="btn">Change password</button></div>
+  </form>
+</div>
+{% endblock %}

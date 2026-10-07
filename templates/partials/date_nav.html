@@ -1,0 +1,9 @@
+<div class="date-nav">
+  <a class="btn btn-gray btn-small" href="{{ url_for('dashboard', date=prev_day, dept=dept_filter) }}" aria-label="Previous day">&larr;</a>
+  <form method="GET" action="{{ url_for('dashboard') }}" class="date-pick">
+    {% if dept_filter %}<input type="hidden" name="dept" value="{{ dept_filter }}">{% endif %}
+    <input type="date" name="date" value="{{ when.isoformat() }}" onchange="this.form.submit()" aria-label="Pick a date">
+  </form>
+  <a class="btn btn-gray btn-small" href="{{ url_for('dashboard', date=next_day, dept=dept_filter) }}" aria-label="Next day">&rarr;</a>
+  {% if not is_today %}<a class="btn btn-small" href="{{ url_for('dashboard', dept=dept_filter) }}">Today</a>{% endif %}
+</div>

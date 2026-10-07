@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Planner{% endblock %}
+{% block nav_planner %}active{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <div>
+    <h1>Timetable Planner</h1>
+    <p class="sub">Set the periods, check the load, then generate a clash-free timetable.</p>
+  </div>
+  <form method="POST" action="{{ url_for('planner_generate') }}" class="gen-form">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button type="submit" class="btn" {{ 'disabled' if not lesson_count }} data-busy="Generating...">⚡ {{ 'Regenerate' if has_table else 'Generate' }} timetable</button>
+  </form>
+</div>
+
+{% if stale %}
+<div class="message error">Teachers, classes or settings changed since the timetable was generated. Regenerate to apply them.</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('planner_save') }}">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <div class="plan-grid">
+    <div class="stack">
+      <div class="card">
+        <h2 class="form-h"><i>1</i> Teaching weeks</h2>
+        <label for="weeks_per_sem">Teaching weeks in the semester</label>
+        <input type="number" id="weeks_per_sem" name="weeks_per_sem" min="1" max="60" value="{{ weeks }}" required>
+        <p class="hint">Each subject needs a total number of periods for the semester (default {{ default_sem }}, set per subject on the teacher's page). Periods a week = semester total &divide; teaching weeks, rounded up.</p>
+      </div>
+
+      <div class="card">
+        <h2 class="form-h"><i>2</i> Periods per day for each year</h2>
+        {% for d in departments %}
+          {% for y in d.years %}
+          <div class="ppd-row">
+            <span><strong>{{ d.name }}</strong> {{ y.label }} <span class="hint">&middot; {{ y.count }} class{{ '' if y.count == 1 else 'es' }}</span></span>
+            <input type="number" name="ppd_{{ y.id }}" min="1" max="{{ grid|length }}" value="{{ y.ppd }}" data-ppd>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="hint">Add a department first.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="form-h"><i>3</i> Working days</h2>
+      <div class="year-checks">
+        {% for i in range(7) %}
+        <label class="year-check"><input type="checkbox" name="days" value="{{ i }}" {{ 'checked' if i in working_days }}> {{ DAY_NAMES[i] }}</label>
+        {% endfor %}
+      </div>
+
+      <h2 class="form-h" style="margin-top:1.5rem"><i>4</i> Period timings</h2>
+      <p class="hint" style="margin:0 0 .75rem">Gaps between periods show up as breaks. Back-to-back periods can be used for lab doubles.</p>
+      <div id="grid-list"></div>
+      <button type="button" class="btn btn-gray btn-small" id="add-period" data-max="{{ max_periods }}">+ Add period</button>
+    </div>
+  </div>
+  <div class="form-buttons"><button type="submit" class="btn">Save settings</button></div>
+</form>
+
+<h2 class="group-title">Load check</h2>
+<div class="plan-grid">
+  <div class="card table-box">
+    <table>
+      <thead><tr><th>Class</th><th>Needs</th><th>Has room for</th><th></th></tr></thead>
+      <tbody>
+      {% for c in class_rows %}
+        <tr><td>{{ c.label }}</td><td>{{ c.required }}</td><td>{{ c.room }}</td>
+          <td>{% if c.status == 'over' %}<span class="badge cancelled">Too many periods</span>
+              {% elif c.status == 'empty' %}<span class="badge wait">No subjects yet</span>
+              {% elif c.status == 'full' %}<span class="badge good">Full week</span>
+              {% else %}<span class="badge">{{ c.free }} free</span>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty">No classes yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card table-box">
+    <table>
+      <thead><tr><th>Teacher</th><th>Periods/week</th><th>Load</th></tr></thead>
+      <tbody>
+      {% for t in teacher_rows %}
+        <tr><td>{{ t.name }}</td><td>{{ t.load }} <span class="hint">of {{ t.room }}</span></td>
+          <td style="min-width:8rem"><div class="meter"><div class="meter-bar {{ 'over' if t.over }}" style="width: {{ t.pct }}%"></div></div>
+            {% if t.over %}<span class="badge cancelled">Overloaded</span>{% endif %}</td></tr>
+      {% else %}<tr><td colspan="3" class="empty">No teachers with classes yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if has_table and coverage %}
+<h2 class="group-title">Not fully scheduled</h2>
+<div class="card table-box">
+  <table>
+    <thead><tr><th>Class</th><th>Subject</th><th>Teacher</th><th>Placed</th></tr></thead>
+    <tbody>
+    {% for c in coverage %}
+      <tr><td>{{ c.label }}</td><td>{{ c.subject }}</td><td>{{ c.teacher }}</td>
+        <td><span class="badge cancelled">{{ c.got }} of {{ c.need }}</span></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="hint">Fix these by reducing periods, widening the teacher's available days, or raising their daily maximum, then regenerate.</p>
+{% endif %}
+
+<script>
+  var GRID = {{ grid|tojson }};
+  var gridList = document.getElementById("grid-list");
+  var addPeriod = document.getElementById("add-period");
+  var MAXP = parseInt(addPeriod.getAttribute("data-max"), 10);
+
+  function renumber() {
+    var rows = gridList.querySelectorAll(".period-row");
+    rows.forEach(function (r, i) { r.querySelector("b").textContent = "Period " + (i + 1); });
+    addPeriod.disabled = rows.length >= MAXP;
+    document.querySelectorAll("[data-ppd]").forEach(function (box) { box.max = rows.length; });
+  }
+  function addRow(start, end) {
+    var row = document.createElement("div");
+    row.className = "period-row";
+    row.innerHTML = '<b></b><input type="time" name="p_start" required><span>to</span><input type="time" name="p_end" required>';
+    var remove = document.createElement("button");
+    remove.type = "button"; remove.className = "btn btn-red btn-small"; remove.textContent = "Remove";
+    remove.addEventListener("click", function () {
+      if (gridList.querySelectorAll(".period-row").length > 1) { gridList.removeChild(row); renumber(); }
+    });
+    row.appendChild(remove);
+    row.querySelector('[name="p_start"]').value = start || "";
+    row.querySelector('[name="p_end"]').value = end || "";
+    gridList.appendChild(row);
+    renumber();
+  }
+  addPeriod.addEventListener("click", function () {
+    var last = gridList.querySelector(".period-row:last-child [name='p_end']");
+    var s = last && last.value ? last.value : "09:00";
+    var parts = s.split(":"), mins = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10) + 50;
+    var e = ("0" + Math.min(23, Math.floor(mins / 60))).slice(-2) + ":" + ("0" + (mins % 60)).slice(-2);
+    addRow(s, e);
+  });
+  GRID.forEach(function (p) { addRow(p.start, p.end); });
+</script>
+{% endblock %}

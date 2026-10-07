@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<div class="dash-head">
+  <div>
+    <h1>{{ 'Today\'s schedule' if is_today else 'Schedule' }}</h1>
+    <p>{{ when_text }}</p>
+  </div>
+  {% include "partials/date_nav.html" %}
+</div>
+
+{% if stale %}<div class="message error">Data changed since the timetable was generated - <a href="{{ url_for('planner') }}">regenerate it</a>.</div>{% endif %}
+
+{% if stats.departments == 0 %}
+<div class="card onboard">
+  <span class="eyebrow">Your workspace is ready</span>
+  <h2>Schedule your departments and classes</h2>
+  <div class="steps">
+    <a href="{{ url_for('add_department') }}"><i>1</i><b>Add departments and classes</b><span>Years, and how many classes (D1, D2...) in each.</span></a>
+    <a href="{{ url_for('add_teacher') }}"><i>2</i><b>Add teachers and subjects</b><span>Which classes each teaches, and the periods per semester.</span></a>
+    <a href="{{ url_for('planner') }}"><i>3</i><b>Generate the schedule</b><span>Set the periods and let ISTS build the timetable.</span></a>
+  </div>
+</div>
+{% endif %}
+
+<div class="cards cards-5">
+  <a class="stat-card tone-purple" href="{{ url_for('departments') }}"><svg><use href="#icon-book"/></svg><div class="stat-number">{{ stats.departments }}</div><div class="stat-name">Departments</div></a>
+  <a class="stat-card tone-blue" href="{{ url_for('departments') }}"><svg><use href="#icon-school"/></svg><div class="stat-number">{{ stats.classes }}</div><div class="stat-name">Classes</div></a>
+  <a class="stat-card tone-green" href="{{ url_for('teachers') }}"><svg><use href="#icon-teacher"/></svg><div class="stat-number">{{ stats.teachers }}</div><div class="stat-name">Teachers</div></a>
+  <div class="stat-card tone-orange"><svg><use href="#icon-calendar-grad"/></svg><div class="stat-number">{{ stats.periods }}</div><div class="stat-name">Periods {{ 'today' if is_today else 'that day' }}</div></div>
+  <div class="stat-card {{ 'tone-red' if stats.uncovered else 'tone-green' }}"><svg><use href="#icon-users"/></svg><div class="stat-number">{{ stats.absent }}</div><div class="stat-name">Absent{% if stats.uncovered %} &middot; {{ stats.uncovered }} uncovered{% endif %}</div></div>
+</div>
+
+<div class="card panel" style="margin-bottom:1rem">
+  <div class="panel-head">
+    <h2>All classes</h2>
+    <form method="GET" action="{{ url_for('dashboard') }}" class="filter-inline">
+      <input type="hidden" name="date" value="{{ when.isoformat() }}">
+      <select name="dept" onchange="this.form.submit()" aria-label="Filter by department">
+        <option value="">All departments</option>
+        {% for d in departments %}<option value="{{ d.id }}" {{ 'selected' if dept_filter == d.id }}>{{ d.name }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  {% if not working %}
+    <p class="empty-small">Not a working day - no classes.</p>
+  {% elif not has_table %}
+    <p class="empty-small">No timetable yet. <a href="{{ url_for('planner') }}">Open the Planner</a> to generate one.</p>
+  {% elif not shown %}
+    <p class="empty-small">No classes to show.</p>
+  {% else %}
+  <div class="table-box tt-wrap">
+    <table class="tt today">
+      <thead><tr><th>Class</th>{% for p in grid %}<th class="{{ 'now' if p.no == on_now }}">P{{ p.no }}<small>{{ p.start|nice_time }}</small></th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for c in shown %}
+        <tr><td class="tt-class">{{ c.dept }} {{ c.year_no }}-{{ c.section }}</td>
+        {% for p in grid %}
+          {% set e = cell.get((c.dept_id, c.year_no, c.section, p.no)) %}
+          <td class="{{ 'now' if p.no == on_now }}">
+          {% if p.no > c.ppd %}<div class="tt-free">&middot;</div>
+          {% elif e %}<div class="tt-cell {{ e.status }}" style="--h: {{ e.subject|subject_hue }}" title="{{ e.subject }} - {{ e.teacher_name }}">
+              <b>{{ e.subject }}</b><span>{{ e.teacher_name }}</span></div>
+          {% else %}<div class="tt-free">free</div>{% endif %}
+          </td>
+        {% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="dash-grid">
+  <div class="card panel">
+    <div class="panel-head"><h2>Absent &amp; cover</h2></div>
+    <form method="POST" action="{{ url_for('absence_add') }}" class="absent-form">
+      <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="date" value="{{ when.isoformat() }}">
+      <select name="teacher_id" required aria-label="Teacher">
+        <option value="">Mark a teacher absent...</option>
+        {% for t in present %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-small" type="submit">Mark absent</button>
+    </form>
+    {% for t in absent_list %}
+      <div class="absent-chip">{{ t.name }}
+        <form method="POST" action="{{ url_for('absence_remove') }}">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="date" value="{{ when.isoformat() }}">
+          <input type="hidden" name="teacher_id" value="{{ t.id }}">
+          <button type="submit" class="chip-x" aria-label="Remove absence">&times;</button>
+        </form></div>
+    {% endfor %}
+    {% if need_cover %}
+      {% if stats.uncovered %}
+      <form method="POST" action="{{ url_for('substitute_auto') }}" style="margin:.75rem 0">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <input type="hidden" name="date" value="{{ when.isoformat() }}">
+        <button type="submit" class="btn btn-full btn-small">⚡ Auto-assign best cover for all</button>
+      </form>
+      {% endif %}
+      {% for e in need_cover %}
+      <div class="cover-item {{ e.status }}">
+        <div class="cover-top"><b>P{{ e.period }} &middot; {{ e.subject }}</b><span class="hint">{{ e.label }} &middot; {{ e.orig_name }} absent</span></div>
+        {% if e.status == 'covered' %}
+          <form method="POST" action="{{ url_for('substitute_remove') }}" class="cover-form">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="date" value="{{ when.isoformat() }}">
+            <input type="hidden" name="dept_id" value="{{ e.dept_id }}"><input type="hidden" name="year_no" value="{{ e.year_no }}">
+            <input type="hidden" name="section" value="{{ e.section }}"><input type="hidden" name="period" value="{{ e.period }}">
+            <span class="pill confirmed">Covered by {{ e.teacher_name }}</span>
+            <button type="submit" class="btn btn-gray btn-small">Undo</button>
+          </form>
+        {% else %}
+          <form method="POST" action="{{ url_for('substitute') }}" class="cover-form">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="date" value="{{ when.isoformat() }}">
+            <input type="hidden" name="dept_id" value="{{ e.dept_id }}"><input type="hidden" name="year_no" value="{{ e.year_no }}">
+            <input type="hidden" name="section" value="{{ e.section }}"><input type="hidden" name="period" value="{{ e.period }}">
+            {% if e.options %}
+            <select name="teacher_id" aria-label="Substitute">
+              {% for o in e.options %}<option value="{{ o.id }}">{{ o.name }}{{ ' (Guest)' if not o.department_id }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn btn-small">Assign</button>
+            {% else %}<span class="pill pending">Nobody is free</span>{% endif %}
+          </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% elif not absent_list %}
+      <p class="empty-small">Everyone is present.</p>
+    {% endif %}
+  </div>
+
+  <div class="card panel">
+    <div class="panel-head"><h2>Free right now</h2></div>
+    {% if on_now %}
+      <p class="hint" style="margin-top:0">Period {{ on_now }} &middot; teachers without a class</p>
+      {% for t in free_now %}<div class="list-item"><div class="avatar sm">{{ t.name[:1]|upper }}</div><div class="list-main"><strong>{{ t.name }}</strong><span>{{ t.dept_name or 'Guest' }}</span></div></div>
+      {% else %}<p class="empty-small">Everyone is teaching.</p>{% endfor %}
+    {% else %}
+      <p class="empty-small">{{ 'Classes are not running right now.' if is_today else 'Shown for today during class hours.' }}</p>
+    {% endif %}
+  </div>
+
+  <div class="card panel">
+    <div class="panel-head"><h2>Teacher workload</h2><a href="{{ url_for('planner') }}">Planner &rarr;</a></div>
+    {% for w in workload %}
+    <div class="load-row">
+      <div class="load-top"><span>{{ w.name }}{% if w.guest %} <span class="badge out">Guest</span>{% endif %}</span><b>{{ w.load }}/{{ w.room }}</b></div>
+      <div class="meter"><div class="meter-bar {{ 'over' if w.load > w.room }}" style="width: {{ w.pct }}%"></div></div>
+    </div>
+    {% else %}<p class="empty-small">No teachers yet.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

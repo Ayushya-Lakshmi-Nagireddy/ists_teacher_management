@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Department' if editing else 'Add Department' }}{% endblock %}
+{% block nav_departments %}active{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <h1>{{ 'Edit Department' if editing else 'Add Department' }}</h1>
+  <a class="btn btn-gray" href="{{ url_for('departments') }}">← Back</a>
+</div>
+
+<div class="card">
+  <form method="POST" action="{{ url_for('edit_department', id=dept.id) if editing else url_for('add_department') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <div class="full">
+        <label for="name">Department Name</label>
+        <input type="text" id="name" name="name" value="{{ dept.name }}" placeholder="Example: CSE" required>
+      </div>
+
+      <div class="full">
+        <label>Years and Classes</label>
+        <p class="hint" style="margin: 0 0 0.625rem;">Add a year, then type how many classes it has. 3 classes means D1, D2, D3.</p>
+        <div id="year-list"></div>
+        <button type="button" class="btn btn-gray btn-small" id="add-year">+ Add Year</button>
+      </div>
+    </div>
+
+    <div class="form-buttons">
+      <button type="submit" class="btn">{{ 'Save Changes' if editing else 'Save Department' }}</button>
+      <a class="btn btn-gray" href="{{ url_for('departments') }}">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  var MAX_YEAR = {{ max_year }};
+  var MAX_CLASSES = {{ max_classes }};
+  var startYears = {{ dept.years|tojson }};
+
+  var list = document.getElementById("year-list");
+  var addButton = document.getElementById("add-year");
+
+  function ordinal(n) {
+    var end = n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th";
+    return n + end + " Year";
+  }
+
+  function usedYears() {
+    var used = [];
+    var selects = list.querySelectorAll("select");
+    for (var i = 0; i < selects.length; i++) { used.push(selects[i].value); }
+    return used;
+  }
+
+  function preview(row) {
+    var count = parseInt(row.querySelector("input").value, 10);
+    var box = row.querySelector(".class-chips");
+    box.innerHTML = "";
+    if (!count || count < 1) { return; }
+    if (count > MAX_CLASSES) { count = MAX_CLASSES; }
+    for (var i = 1; i <= count; i++) {
+      var chip = document.createElement("span");
+      chip.className = "class-chip";
+      chip.textContent = "D" + i;
+      box.appendChild(chip);
+    }
+  }
+
+  function refreshAdd() {
+    addButton.disabled = list.querySelectorAll(".year-row").length >= MAX_YEAR;
+  }
+
+  function addYearRow(year, count) {
+    var row = document.createElement("div");
+    row.className = "year-row";
+
+    var select = document.createElement("select");
+    select.name = "year_no";
+    for (var n = 1; n <= MAX_YEAR; n++) {
+      var option = document.createElement("option");
+      option.value = n;
+      option.textContent = ordinal(n);
+      select.appendChild(option);
+    }
+    select.value = year;
+
+    var wrap = document.createElement("div");
+    wrap.className = "count-box";
+    var label = document.createElement("span");
+    label.textContent = "Classes:";
+    var input = document.createElement("input");
+    input.type = "number";
+    input.name = "class_count";
+    input.min = 1;
+    input.max = MAX_CLASSES;
+    input.value = count;
+    input.addEventListener("input", function () { preview(row); });
+    wrap.appendChild(label);
+    wrap.appendChild(input);
+
+    var chips = document.createElement("div");
+    chips.className = "class-chips";
+
+    var remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn-red btn-small";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", function () { list.removeChild(row); refreshAdd(); });
+
+    row.appendChild(select);
+    row.appendChild(wrap);
+    row.appendChild(chips);
+    row.appendChild(remove);
+    list.appendChild(row);
+    preview(row);
+    refreshAdd();
+  }
+
+  addButton.addEventListener("click", function () {
+    var used = usedYears();
+    var next = 1;
+    while (used.indexOf(String(next)) !== -1 && next < MAX_YEAR) { next++; }
+    addYearRow(next, 3);
+  });
+
+  if (startYears.length === 0) { startYears = [{year_no: 1, count: 3}]; }
+  for (var i = 0; i < startYears.length; i++) { addYearRow(startYears[i].year_no, startYears[i].count); }
+</script>
+{% endblock %}

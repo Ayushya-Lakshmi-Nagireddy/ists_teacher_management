@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "partials/head.html" %}
+  <title>Register - ISTS</title>
+</head>
+<body class="auth-page">
+  {% include "partials/icons.html" %}
+  <div class="corner-button">{% include "partials/theme_button.html" %}</div>
+  <main class="auth-card wide">
+    <div class="auth-head">
+      <img class="auth-logo" src="{{ url_for('static', filename='images/logo.png') }}" alt="ISTS">
+      <p class="auth-caption">International School of Technology and Sciences for Women</p>
+    </div>
+    <h1>Create your account</h1>
+    <p class="lead">Pick your role to get started.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="message {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+        <div class="seg" role="tablist">
+          <a href="{{ url_for('register', role='hod') }}" class="{{ 'active' if role == 'hod' }}"><svg><use href="#icon-person"/></svg>HOD</a>
+          <a href="{{ url_for('register', role='teacher') }}" class="{{ 'active' if role == 'teacher' }}"><svg><use href="#icon-teacher"/></svg>Teacher</a>
+        </div>
+        <form method="POST" action="{{ url_for('register') }}">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="role" value="{{ role }}">
+          {% if role == 'hod' %}
+          <div class="field"><label for="full_name">Your name</label>
+            <div class="input-icon"><svg><use href="#icon-person"/></svg><input type="text" id="full_name" name="full_name"  autofocus required></div></div>
+          <div class="field"><label for="username">Username</label>
+            <div class="input-icon"><svg><use href="#icon-person"/></svg><input type="text" id="username" name="username" autocomplete="username" required></div></div>
+          <div class="two">
+          <div class="field"><label for="password">Password</label>
+            <div class="input-icon"><svg><use href="#icon-lock"/></svg><input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required>
+              <button type="button" class="show-button">Show</button></div></div>
+          <div class="field"><label for="confirm_password">Confirm</label>
+            <div class="input-icon"><svg><use href="#icon-lock"/></svg><input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password"  required>
+              <button type="button" class="show-button">Show</button></div></div>
+          </div>
+          <p class="hint" style="margin:-0.25rem 0 0.75rem">At least 8 characters. You get your own empty workspace for departments, teachers and timetables.</p>
+          {% else %}
+          <div class="field"><label for="full_name">Your name</label>
+            <div class="input-icon"><svg><use href="#icon-teacher"/></svg><input type="text" id="full_name" name="full_name"  placeholder="As your HOD entered it, e.g. Mr. Rao" autofocus required></div></div>
+          <div class="field"><label for="subject">A subject you teach</label>
+            <div class="input-icon"><svg><use href="#icon-book"/></svg><input type="text" id="subject" name="subject"  placeholder="e.g. Maths" required></div><p class="hint">We check your name and subject against your HOD's records before creating the login.</p></div>
+          <div class="field"><label for="username">Choose a username</label>
+            <div class="input-icon"><svg><use href="#icon-person"/></svg><input type="text" id="username" name="username" autocomplete="username" required></div><p class="hint">Letters, numbers, dots, dashes.</p></div>
+          <div class="two">
+          <div class="field"><label for="password">Password</label>
+            <div class="input-icon"><svg><use href="#icon-lock"/></svg><input type="password" id="password" name="password" autocomplete="new-password" minlength="8" required>
+              <button type="button" class="show-button">Show</button></div></div>
+          <div class="field"><label for="confirm_password">Confirm</label>
+            <div class="input-icon"><svg><use href="#icon-lock"/></svg><input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password"  required>
+              <button type="button" class="show-button">Show</button></div></div>
+          </div>
+          <div class="field"><label for="hod_username">HOD's username <span class="opt">(only if asked)</span></label>
+            <div class="input-icon"><svg><use href="#icon-person"/></svg><input type="text" id="hod_username" name="hod_username"  ></div></div>
+          {% endif %}
+          <button type="submit" class="btn btn-full">{{ 'Create my workspace' if role == 'hod' else 'Register as teacher' }}</button>
+        </form>
+        <p class="auth-foot">Already registered? <a href="{{ url_for('login', role=role) }}">Sign in</a></p>
+  </main>
+</body>
+</html>

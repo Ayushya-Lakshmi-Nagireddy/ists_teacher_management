@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}My Today{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<div class="dash-head">
+  <div>
+    <h1>{{ 'Today' if is_today else when_text }}</h1>
+    <p>{{ session.full_name }} &middot; {{ when_text }}</p>
+  </div>
+  {% include "partials/date_nav.html" %}
+</div>
+
+{% if absent %}<div class="message error">You are marked absent on this day. The HOD will arrange cover for your classes.</div>{% endif %}
+
+<div class="cards cards-4">
+  <div class="stat-card tone-purple"><div class="stat-number">{{ mine|length }}</div><div class="stat-name">Periods {{ 'today' if is_today else 'this day' }}</div></div>
+  <div class="stat-card tone-blue"><div class="stat-number">{{ week }}</div><div class="stat-name">Periods per week</div></div>
+  <div class="stat-card tone-green"><div class="stat-number">{{ classes|length }}</div><div class="stat-name">Classes I teach</div></div>
+  <div class="stat-card tone-orange"><div class="stat-number">{{ covering }}</div><div class="stat-name">Cover duties</div></div>
+</div>
+
+<div class="card panel">
+  <div class="panel-head"><h2>My schedule</h2><a href="{{ url_for('my_timetable') }}">Full week &rarr;</a></div>
+  {% if not working %}
+    <p class="empty-small">No classes on this day.</p>
+  {% elif not mine %}
+    <p class="empty-small">{{ 'You have no classes on this day.' if not absent else 'Nothing for you today.' }}</p>
+  {% else %}
+    {% for e in mine %}
+    {% set t = times[e.period] %}
+    <div class="list-item {{ 'now' if e.period == on_now }} {{ 'next' if e.period == upcoming and not on_now }}">
+      <div class="period-badge">P{{ e.period }}</div>
+      <div class="list-main">
+        <strong>{{ e.subject }}{% if e.block == 2 %} <span class="badge good">Lab</span>{% endif %}
+          {% if e.status == 'covered' %}<span class="badge wait">Cover for {{ e.orig_name }}</span>{% endif %}</strong>
+        <span>{{ e.label }}</span>
+      </div>
+      <div class="list-side">{{ t.start|nice_time }} - {{ t.end|nice_time }}
+        {% if e.period == on_now %}<br><span class="pill confirmed">Now</span>{% elif e.period == upcoming and not on_now %}<br><span class="pill checked-in">Next</span>{% endif %}</div>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

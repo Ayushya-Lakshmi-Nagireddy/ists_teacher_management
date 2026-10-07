@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Timetable{% endblock %}
+{% block nav_timetable %}{{ 'active' if not own }}{% endblock %}
+{% block nav_mytimetable %}{{ 'active' if own }}{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <div>
+    <h1>{{ 'My Timetable' if own else 'Timetable' }}</h1>
+    {% if title %}<p class="sub">{{ title }} &middot; {{ sub }}{% if generated %} &middot; generated {{ generated }}{% endif %}</p>{% endif %}
+  </div>
+  <button type="button" class="btn btn-gray" onclick="window.print()">Print</button>
+</div>
+
+{% if stale and not own %}
+<div class="message error">This timetable is out of date - <a href="{{ url_for('planner') }}">regenerate it in the Planner</a>.</div>
+{% endif %}
+
+{% if not own %}
+<div class="view-tabs">
+  <a class="tab {{ 'active' if view == 'class' }}" href="{{ url_for('timetable', view='class') }}">By class</a>
+  <a class="tab {{ 'active' if view == 'teacher' }}" href="{{ url_for('timetable', view='teacher') }}">By teacher</a>
+</div>
+<form method="GET" action="{{ url_for('timetable') }}" class="search-form">
+  <input type="hidden" name="view" value="{{ view }}">
+  {% if view == 'class' %}
+  <select name="class" onchange="this.form.submit()" aria-label="Class">
+    {% for c in classes %}<option value="{{ c.key }}" {{ 'selected' if c.key == selected }}>{{ c.label }}</option>{% endfor %}
+  </select>
+  {% else %}
+  <select name="teacher" onchange="this.form.submit()" aria-label="Teacher">
+    {% for t in teachers %}<option value="{{ t.id }}" {{ 'selected' if t.id|string == selected }}>{{ t.name }}{{ ' (Guest)' if not t.department_id }}</option>{% endfor %}
+  </select>
+  {% endif %}
+</form>
+{% endif %}
+
+{% if (own or classes or teachers) and cells %}
+  {% include "partials/timetable_grid.html" %}
+{% elif own or classes or teachers %}
+  <div class="card empty">Nothing scheduled yet{% if not own %} for this {{ view }}{% endif %}.
+    {% if not own %}Generate the timetable in the <a href="{{ url_for('planner') }}">Planner</a>.{% else %}Your HOD has not generated the timetable yet.{% endif %}</div>
+{% else %}
+  <div class="card empty">Add departments and teachers first.</div>
+{% endif %}
+
+{% if own and my_classes %}
+<h2 class="group-title">My classes</h2>
+<div class="class-chips">
+  {% for a in my_classes %}<span class="class-chip" style="--h: {{ a.subject|subject_hue }}">{{ a.subject }} &middot; {{ a.dept_name }} {{ a.year_no|year_label }} {{ a.section }} &middot; {{ a.sem_periods }}/sem &middot; {{ a.periods_per_week }}/wk</span>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}

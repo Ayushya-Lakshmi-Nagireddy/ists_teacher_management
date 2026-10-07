@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "partials/head.html" %}
+  <title>Sign in - ISTS</title>
+</head>
+<body class="auth-page">
+  {% include "partials/icons.html" %}
+  <div class="corner-button">{% include "partials/theme_button.html" %}</div>
+  <main class="auth-card">
+    <div class="auth-head">
+      <img class="auth-logo" src="{{ url_for('static', filename='images/logo.png') }}" alt="ISTS">
+      <p class="auth-caption">International School of Technology and Sciences for Women</p>
+    </div>
+    <h1>Welcome back</h1>
+    <p class="lead">Choose how you sign in.</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="message {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+        <div class="seg" role="tablist">
+          <a href="{{ url_for('login', role='hod') }}" class="{{ 'active' if role == 'hod' }}"><svg><use href="#icon-person"/></svg>HOD</a>
+          <a href="{{ url_for('login', role='teacher') }}" class="{{ 'active' if role == 'teacher' }}"><svg><use href="#icon-teacher"/></svg>Teacher</a>
+        </div>
+        <form method="POST" action="{{ url_for('login') }}">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="role" value="{{ role }}">
+          <div class="field"><label for="username">Username</label>
+            <div class="input-icon"><svg><use href="#icon-person"/></svg><input type="text" id="username" name="username" autocomplete="username" autofocus required></div></div>
+          <div class="field"><label for="password">Password</label>
+            <div class="input-icon"><svg><use href="#icon-lock"/></svg><input type="password" id="password" name="password" autocomplete="current-password"  required>
+              <button type="button" class="show-button">Show</button></div></div>
+          <button type="submit" class="btn btn-full">Sign in as {{ 'HOD' if role == 'hod' else 'teacher' }}</button>
+        </form>
+        <p class="auth-foot">New here? <a href="{{ url_for('register', role=role) }}">Create a {{ 'HOD' if role == 'hod' else 'teacher' }} account</a></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Teacher' if editing else 'Add Teacher' }}{% endblock %}
+{% block nav_teachers %}active{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <h1>{{ 'Edit Teacher' if editing else 'Add Teacher' }}</h1>
+  <a class="btn btn-gray" href="{{ url_for('teachers') }}">&larr; Back</a>
+</div>
+
+<form method="POST" action="{{ url_for('edit_teacher', id=teacher.id) if editing else url_for('add_teacher') }}" id="teacher-form">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+
+  <div class="card" style="margin-bottom:1rem">
+    <h2 class="form-h"><i>1</i> Teacher details</h2>
+    <div class="form-grid">
+      <div>
+        <label for="name">Full name</label>
+        <input type="text" id="name" name="name" value="{{ form.name }}" placeholder="Example: Mr. Rao" required>
+      </div>
+      <div>
+        <label for="department">Department</label>
+        <select id="department" name="department">
+          {% for d in departments %}
+          <option value="{{ d.id }}" {{ 'selected' if form.department == d.id|string }}>{{ d.name }}</option>
+          {% endfor %}
+          <option value="guest" {{ 'selected' if form.department == 'guest' }}>Guest (visiting teacher)</option>
+        </select>
+        <p class="hint">Guests are not part of a department and can teach any department's classes.</p>
+      </div>
+      <div class="full">
+        <label>Days available</label>
+        <div class="year-checks">
+          {% for i in range(7) %}
+          <label class="year-check"><input type="checkbox" name="days" value="{{ i }}"
+            {{ 'checked' if i in form.days }} {{ 'disabled' if i not in working_days and i not in form.days }}> {{ DAY_SHORT[i] }}</label>
+          {% endfor %}
+        </div>
+        <p class="hint">Useful for guests who only come on some days.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 class="form-h"><i>2</i> Subjects and classes</h2>
+    <p class="hint" style="margin:0 0 .75rem">Pick the department and year, tick the classes (D1, D2...) this teacher takes, then the subject and the total periods it needs in the semester (default {{ default_sem }}, change it freely). Teachers then register themselves with their name and one of these subjects.
+      Choose "Lab (double)" to always place the periods back to back.</p>
+    <div id="asg-list"></div>
+    <button type="button" class="btn btn-gray btn-small" id="add-asg">+ Add class</button>
+  </div>
+
+  <div class="form-buttons">
+    <button type="submit" class="btn">{{ 'Save Changes' if editing else 'Save Teacher' }}</button>
+    <a class="btn btn-gray" href="{{ url_for('teachers') }}">Cancel</a>
+  </div>
+</form>
+
+<script>
+  var DEFAULT_SEM = {{ default_sem }};
+  var DEPTS = {{ departments|tojson }};
+  var START = {{ assignments|tojson }};
+  var list = document.getElementById("asg-list");
+  var teacherDept = document.getElementById("department");
+
+  function el(tag, attrs, text) {
+    var e = document.createElement(tag);
+    for (var k in attrs) { e.setAttribute(k, attrs[k]); }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
+  }
+  function field(label, node) {
+    var w = el("div", {"class": "asg-field"});
+    w.appendChild(el("label", {}, label));
+    w.appendChild(node);
+    return w;
+  }
+  function fillOptions(select, items, value) {
+    select.innerHTML = "";
+    items.forEach(function (it) {
+      var o = el("option", {value: it.value}, it.text);
+      select.appendChild(o);
+    });
+    if (value !== undefined && value !== null) { select.value = String(value); }
+  }
+  function findDept(id) { return DEPTS.filter(function (d) { return String(d.id) === String(id); })[0]; }
+
+  var rowCounter = 0;
+
+  function addRow(a) {
+    a = a || {};
+    var id = String(++rowCounter);
+    var row = el("div", {"class": "asg-row"});
+    var hidden = el("input", {type: "hidden", name: "asg_row", value: id});
+    var dept = el("select", {name: "asg_dept"});
+    var year = el("select", {name: "asg_year"});
+    var sects = el("div", {"class": "year-checks"});
+    var subj = el("input", {type: "text", name: "asg_subject", placeholder: "Subject", maxlength: 60, required: ""});
+    var sem = el("input", {type: "number", name: "asg_sem", min: 1, max: 500, required: ""});
+
+    var block = el("select", {name: "asg_block"});
+    fillOptions(block, [{value: 1, text: "Normal periods"}, {value: 2, text: "Lab (double)"}], a.block || 1);
+
+    fillOptions(dept, DEPTS.map(function (d) { return {value: d.id, text: d.name}; }));
+    var defaultDept = a.dept || (teacherDept.value !== "guest" ? teacherDept.value : (DEPTS[0] ? DEPTS[0].id : ""));
+    dept.value = String(defaultDept);
+
+    function refreshYears(keepYear, keepSections) {
+      var d = findDept(dept.value);
+      var years = d ? d.years : [];
+      fillOptions(year, years.map(function (y) { return {value: y.year_no, text: y.label}; }), keepYear);
+      refreshSections(keepSections);
+    }
+    function refreshSections(keep) {
+      var d = findDept(dept.value);
+      var y = d ? d.years.filter(function (x) { return String(x.year_no) === year.value; })[0] : null;
+      sects.innerHTML = "";
+      (y ? y.classes : []).forEach(function (c) {
+        var label = el("label", {"class": "year-check"});
+        var box = el("input", {type: "checkbox", name: "asg_sec_" + id, value: c});
+        if (keep && keep.indexOf(c) !== -1) { box.checked = true; }
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(" " + c));
+        sects.appendChild(label);
+      });
+    }
+    dept.addEventListener("change", function () { refreshYears(); });
+    year.addEventListener("change", function () { refreshSections(); });
+
+    subj.value = a.subject || "";
+    sem.value = a.sem || DEFAULT_SEM;
+    refreshYears(a.year, a.sections || (a.dept ? [] : ["D1"]));
+
+    var remove = el("button", {type: "button", "class": "btn btn-red btn-small"}, "Remove");
+    remove.addEventListener("click", function () { list.removeChild(row); });
+
+    row.appendChild(hidden);
+    row.appendChild(field("Department", dept));
+    row.appendChild(field("Year", year));
+    row.appendChild(field("Classes (tick all this teacher takes)", sects));
+    row.appendChild(field("Subject", subj));
+    row.appendChild(field("Periods in the semester", sem));
+    row.appendChild(field("Type", block));
+    row.appendChild(remove);
+    list.appendChild(row);
+  }
+
+  document.getElementById("add-asg").addEventListener("click", function () { addRow(); });
+  START.forEach(addRow);
+
+  document.getElementById("gen-pass").addEventListener("click", function () {
+    var chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    var bytes = new Uint32Array(10);
+    crypto.getRandomValues(bytes);
+    var out = "";
+    for (var i = 0; i < bytes.length; i++) { out += chars[bytes[i] % chars.length]; }
+    var box = document.getElementById("password");
+    box.type = "text";
+    box.value = out;
+    box.parentElement.querySelector(".show-button").textContent = "Hide";
+  });
+</script>
+{% endblock %}

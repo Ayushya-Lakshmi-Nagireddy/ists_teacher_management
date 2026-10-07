@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "partials/head.html" %}
+  <title>Error - ISTS</title>
+</head>
+<body class="auth-page">
+  {% include "partials/icons.html" %}
+  <div class="corner-button">{% include "partials/theme_button.html" %}</div>
+  <main class="auth-card">
+    <div class="auth-head">
+      <img class="auth-logo" src="{{ url_for('static', filename='images/logo.png') }}" alt="ISTS">
+      <p class="auth-caption">International School of Technology and Sciences for Women</p>
+    </div>
+    <h1>{{ code }}</h1>
+    <p class="lead">{{ text }}</p>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="message {{ category }}">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    <a class="btn btn-full" href="{{ url_for('dashboard') }}">Back to ISTS</a>
+  </main>
+</body>
+</html>

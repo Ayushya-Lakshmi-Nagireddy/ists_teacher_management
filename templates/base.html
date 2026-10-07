@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {% include "partials/head.html" %}
+  <title>{% block title %}Home{% endblock %} - ISTS</title>
+</head>
+<body>
+  {% include "partials/icons.html" %}
+
+  <header class="nav">
+    <a class="brand" href="{{ url_for('dashboard') }}">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="ISTS">
+    </a>
+
+    <nav class="nav-links" aria-label="Main">
+      <a href="{{ url_for('dashboard') }}" class="{% block nav_dashboard %}{% endblock %}">
+        <svg><use href="#icon-home"/></svg>{{ 'Dashboard' if session.role == 'hod' else 'My Today' }}</a>
+      {% if session.role == 'hod' %}
+      <a href="{{ url_for('departments') }}" class="{% block nav_departments %}{% endblock %}">
+        <svg><use href="#icon-book"/></svg>Departments</a>
+      <a href="{{ url_for('teachers') }}" class="{% block nav_teachers %}{% endblock %}">
+        <svg><use href="#icon-teacher"/></svg>Teachers</a>
+      <a href="{{ url_for('planner') }}" class="{% block nav_planner %}{% endblock %}">
+        <svg><use href="#icon-calendar-grad"/></svg>Planner</a>
+      <a href="{{ url_for('timetable') }}" class="{% block nav_timetable %}{% endblock %}">
+        <svg><use href="#icon-calendar"/></svg>Timetable</a>
+      {% else %}
+      <a href="{{ url_for('my_timetable') }}" class="{% block nav_mytimetable %}{% endblock %}">
+        <svg><use href="#icon-calendar"/></svg>My Timetable</a>
+      {% endif %}
+    </nav>
+
+    <div class="nav-right">
+      {% include "partials/theme_button.html" %}
+      <a class="who" href="{{ url_for('account') }}" title="Account and password">
+        <span class="avatar sm">{{ session.full_name[:1]|upper }}</span>
+        <span>{{ session.full_name }}<small>{{ 'Head of department' if session.role == 'hod' else 'Teacher' }}</small></span>
+      </a>
+      <form method="POST" action="{{ url_for('logout') }}">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button type="submit" class="icon-btn" aria-label="Log out" title="Log out"><svg><use href="#icon-logout"/></svg></button>
+      </form>
+    </div>
+  </header>
+
+  <main class="wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="message {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
